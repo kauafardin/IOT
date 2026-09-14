@@ -107,87 +107,57 @@ alterada no simulador.
 
 ### 1. Com suas palavras, o que é o Cloudflare Workers e o que é o KV?
 
-O Cloudflare Workers roda código na nuvem sem precisar de servidor. Eu escrevo uma
-função em JavaScript, faço o deploy e ganho uma URL. Quando alguém acessa essa URL, a
-função roda e responde.
+O Workers é um lugar pra rodar código na nuvem sem ter que montar um servidor. Eu fiz o
+código em JavaScript, dei deploy e ele virou uma URL. Toda vez que alguém chama essa URL,
+o código roda e responde.
 
-O KV é o banco de dados. Ele guarda tudo em pares de chave e valor: cada leitura é
-salva com uma chave (que é um texto) e depois é buscada por essa mesma chave. Não tem
-tabela nem SQL. Eu usei três comandos: `put` para gravar, `get` para ler e `list` para
-listar as chaves de um prefixo.
+O KV é o banco de dados que eu usei. Ele é bem simples: guarda um valor ligado a uma
+chave, e pra pegar o valor de volta é só usar a mesma chave. Não tem tabela nem SQL.
 
-Os dois se completam. O Worker é a API, que recebe e responde. O KV é onde o dado fica
-guardado. Sem o KV o dado se perderia, porque o Worker roda e termina a cada requisição.
+Então o Worker é quem recebe e responde as requisições, e o KV é onde os dados ficam
+salvos.
 
 ### 2. Explique o caminho de um dado desde o sensor físico até ficar salvo no KV.
 
-1. O DHT22 mede a temperatura e manda o valor para o ESP32 pelo GPIO 4. No código isso
-   é o `dht.readTemperature()`.
-2. O ESP32, já conectado no Wi-Fi, monta uma requisição HTTP: método POST, caminho
-   `/insert` e o corpo `{"sensor":"temp","valor":27.8}`.
-3. Essa requisição vai pelo roteador e chega na URL do meu Worker.
-4. O Worker roda, vê que o caminho é `/insert`, lê o corpo com `request.json()` e separa
-   o nome do sensor e o valor.
-5. O Worker chama `env.KV_SENSOR.put()` e grava duas chaves: a `sensor:temp:last`, com a
-   leitura mais nova, e a `sensor:temp:<timestamp>`, que vai formando o histórico.
-6. O Worker responde `OK: temp=27.8`. O ESP32 lê essa resposta e vai dormir.
+Primeiro o sensor mede a temperatura e o ESP32 lê esse valor. Com o Wi-Fi conectado, o
+ESP32 manda um POST pro `/insert` do Worker com a temperatura em JSON.
 
-Na volta é o contrário: o nó atuador chama `GET /get?sensor=temp`, o Worker busca no KV
-e devolve o JSON, e o ESP32 lê o valor e decide se acende o LED.
+O Worker recebe, pega o valor e salva no KV com o `put`. Ele grava em duas chaves: a
+`sensor:temp:last`, que é sempre a última leitura, e uma com o timestamp, que vai
+formando o histórico. No fim ele responde "OK" e o ESP32 vai dormir.
 
 ### 3. O que o Deep Sleep desliga no ESP32 e por que isso economiza energia? O que muda no consumo?
 
-O Deep Sleep desliga a CPU, o Wi-Fi, o Bluetooth, quase toda a memória RAM e os
-periféricos. Fica ligada só a parte RTC, que é um temporizador de consumo bem baixo e é
-quem acorda a placa depois.
+No Deep Sleep o ESP32 desliga quase tudo: o processador, o Wi-Fi e a maior parte da
+memória. Só fica ligado um relógio interno que serve pra acordar a placa na hora certa.
 
-Isso economiza porque o que gasta energia no ESP32 é o Wi-Fi transmitindo e a CPU
-rodando. Com o Wi-Fi ligado o consumo fica em torno de 80 a 160 mA. Dormindo, cai para
-a casa dos microamperes.
-
-Na prática, um sensor ligado direto acabaria com uma bateria em menos de um dia.
-Acordando só alguns segundos a cada 30 s, a mesma bateria dura semanas. A troca é que
-eu não tenho o dado o tempo todo, só a cada intervalo.
+Economiza porque o que mais gasta energia é justamente o Wi-Fi e o processador. Ligado
+ele consome algo entre 80 e 160 mA, e dormindo cai pra poucos microamperes. Assim uma
+bateria dura muito mais tempo.
 
 ### 4. Por que a variável de contagem usa `RTC_DATA_ATTR`? O que aconteceria sem isso?
 
-Porque o ESP32 não continua de onde parou quando acorda: ele reinicia e roda o `setup()`
-de novo. Como a RAM normal foi desligada durante o sono, qualquer variável comum volta
-ao valor inicial.
+Quando o ESP32 acorda do Deep Sleep ele reinicia e roda o `setup()` de novo, então as
+variáveis normais voltam pro valor inicial. O `RTC_DATA_ATTR` guarda a variável numa
+memória que continua ligada enquanto a placa dorme, e por isso o valor não se perde.
 
-O `RTC_DATA_ATTR` guarda a variável na memória RTC, que continua ligada enquanto a placa
-dorme. Por isso o contador sobrevive.
-
-Sem isso, `envios` voltaria para zero toda vez e o Serial Monitor mostraria "Envio #1"
-para sempre. Vale lembrar que o `= 0` só vale quando eu energizo a placa ou aperto o
-reset. Ao acordar do deep sleep o valor é mantido.
+Sem ele o contador ia voltar pra zero toda vez e sempre ia aparecer "Envio #1".
 
 ### 5. Por que o nó sensor dorme, mas o nó atuador fica ligado?
 
-Porque eles fazem coisas diferentes.
+O sensor só precisa mandar a temperatura de tempos em tempos, então ele pode acordar,
+enviar e dormir de novo. Como normalmente ele fica na bateria, dormir faz a bateria
+durar mais.
 
-O nó sensor só precisa falar de vez em quando. Ele fica a bateria, longe da tomada, e a
-temperatura não muda tanto de um minuto para o outro. Então ele acorda, mede, envia e
-dorme.
-
-O nó atuador precisa reagir na hora. Se ele dormisse, o LED ficaria aceso ou apagado
-durante todo o sono, mesmo com a temperatura já tendo mudado. Além disso ele costuma
-estar na tomada, porque quem aciona uma lâmpada ou um relé já precisa de energia.
-
-Resumindo: quem manda o dado pode dormir, quem responde ao dado precisa estar acordado.
-Como o KV guarda o último valor, o atuador consegue ler mesmo com o sensor dormindo.
+O atuador precisa estar sempre ligado pra reagir rápido quando a temperatura muda. Se
+ele dormisse, o LED ia demorar pra acender ou apagar. E ele normalmente fica na tomada,
+então não precisa economizar energia.
 
 ### 6. Por que o ESP32 precisa conectar no Wi-Fi antes de enviar a leitura?
 
-Porque o HTTP depende da rede. Sem conexão não existe caminho para a requisição sair.
-Enquanto o ESP32 não conecta no roteador, ele não tem IP e não consegue nem descobrir o
-endereço do `workers.dev`. O `http.POST()` falharia e devolveria um código negativo.
-
-Por isso o código fica esperando no laço até `WiFi.status()` virar `WL_CONNECTED`. Só
-depois disso é que ele abre a conexão com o Worker.
-
-Outro detalhe: o ESP32 só enxerga rede de 2,4 GHz. Se o roteador estiver em 5 GHz, ele
-nem acha a rede.
+Porque sem internet não tem como a requisição chegar no Worker. Enquanto não conecta, o
+ESP32 não tem nem IP, então o envio ia dar erro. Por isso o código espera o Wi-Fi
+conectar antes de mandar qualquer coisa.
 
 ---
 
