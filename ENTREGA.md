@@ -74,7 +74,9 @@ consulta `GET /get?sensor=temp` a cada 10 segundos. No nó sensor, a temperatura
 foi colocada em 35 °C. Depois do envio, o atuador leu `temp = 35.0 C`, que passa do
 limite de 30 °C, e acendeu o LED.
 
-![LED aceso no nó atuador](imagens/07-etapa7-led.png)
+![Temperatura do DHT22 ajustada para 35 °C no nó sensor](imagens/07-etapa7-sensor-35.png)
+
+![LED aceso no nó atuador](imagens/08-etapa7-led.png)
 
 ### Etapa 8 — histórico pelo /list
 
