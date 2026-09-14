@@ -51,7 +51,7 @@ No Wokwi, o ESP32 conecta na rede `Wokwi-GUEST`, lê o DHT22 e envia a temperatu
 `POST /insert`. O Worker respondeu HTTP 200 e o `GET /get` mostra o mesmo valor que saiu
 no Serial Monitor.
 
-![Último valor pelo /get](imagens/05-etapa5-get.png)
+![Envio pelo ESP32 no Serial Monitor e o mesmo valor no /get](imagens/05-etapa5-get.png)
 
 ### Etapa 6 — deep sleep
 
