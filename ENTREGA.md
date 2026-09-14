@@ -94,6 +94,13 @@ mais recente.
 
 ![Chaves no Cloudflare KV](imagens/03-etapa8-kv-painel.png)
 
+Depois, com o nó sensor rodando, as leituras do ESP32 também foram gravadas no mesmo
+namespace. Abaixo das três chaves do teste pelo PowerShell (26.1, 29.3 e 31.7) aparecem
+as leituras enviadas pelo DHT22: primeiro 24 °C e depois 35 °C, quando a temperatura foi
+alterada no simulador.
+
+![Leituras do ESP32 gravadas no Cloudflare KV](imagens/09-kv-painel-esp32.png)
+
 ---
 
 ## Perguntas
